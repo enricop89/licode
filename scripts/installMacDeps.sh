@@ -177,7 +177,7 @@ install_mediadeps(){
 }
 
 install_mediadeps_nogpl(){
-  brew install opus libvpx
+#  brew install opus libvpx
   if [ -d $LIB_DIR ]; then
     cd $LIB_DIR
     curl -O https://www.libav.org/releases/libav-11.6.tar.gz

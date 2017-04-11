@@ -24,8 +24,13 @@ Erizo.Stream = function (spec) {
 
     if (that.videoSize !== undefined &&
         (!(that.videoSize instanceof Array) ||
-           that.videoSize.length !== 4)) {
+        that.videoSize.length !== 4)) {
         throw Error('Invalid Video Size');
+    }
+    if (that.videoFrameRate !== undefined &&
+        (!(that.videoFrameRate instanceof Array) ||
+        that.videoFrameRate.length !== 2)) {
+        throw Error('Invalid Video Frame rate');
     }
     if (spec.local === undefined || spec.local === true) {
         that.local = true;
@@ -51,11 +56,11 @@ Erizo.Stream = function (spec) {
     };
 
     // Changes the attributes of this stream in the room.
-    that.setAttributes = function() {
+    that.setAttributes = function () {
         L.Logger.error('Failed to set attributes data. This Stream object has not been published.');
     };
 
-    that.updateLocalAttributes = function(attrs) {
+    that.updateLocalAttributes = function (attrs) {
         spec.attributes = attrs;
     };
 
@@ -87,64 +92,69 @@ Erizo.Stream = function (spec) {
     // Initializes the stream and tries to retrieve a stream from local video and audio
     // We need to call this method before we can publish it in the room.
     that.init = function () {
-      var streamEvent;
-      try {
-        if ((spec.audio || spec.video || spec.screen) && spec.url === undefined) {
-          L.Logger.info('Requested access to local media');
-          var videoOpt = spec.video;
-          if (videoOpt === true || spec.screen === true) {
-              videoOpt = {};
-              if (that.videoSize !== undefined) {
-                  videoOpt.mandatory = {};
-                  videoOpt.mandatory.minWidth = that.videoSize[0];
-                  videoOpt.mandatory.minHeight = that.videoSize[1];
-                  videoOpt.mandatory.maxWidth = that.videoSize[2];
-                  videoOpt.mandatory.maxHeight = that.videoSize[3];
-              }
+        var streamEvent;
+        try {
+            if ((spec.audio || spec.video || spec.screen) && spec.url === undefined) {
+                L.Logger.info('Requested access to local media');
+                var videoOpt = spec.video;
+                if (videoOpt === true || spec.screen === true) {
+                    videoOpt = {};
+                    if (that.videoSize !== undefined) {
+                        videoOpt.width = {};
+                        videoOpt.height = {};
+                        videoOpt.width.min = that.videoSize[0];
+                        videoOpt.height.min = that.videoSize[1];
+                        videoOpt.width.max = that.videoSize[2];
+                        videoOpt.height.max = that.videoSize[3];
+                        // Ideal parameter currently not implemented
+                    }
 
-              if (that.videoFrameRate !== undefined) {
-                  videoOpt.optional = [];
-                  videoOpt.optional.push({minFrameRate: that.videoFrameRate[0]});
-                  videoOpt.optional.push({maxFrameRate: that.videoFrameRate[1]});
-              }
+                    if (that.videoFrameRate !== undefined) {
+                        videoOpt.frameRate = {};
+                        videoOpt.frameRate.min = that.videoFrameRate[0];
+                        videoOpt.frameRate.max = that.videoFrameRate[1];
 
-          } else if (spec.screen === true && videoOpt === undefined) {
-            videoOpt = true;
-          }
-          var opt = {video: videoOpt,
-                     audio: spec.audio,
-                     fake: spec.fake,
-                     screen: spec.screen,
-                     extensionId:that.extensionId};
-          L.Logger.debug(opt);
-          Erizo.GetUserMedia(opt, function (stream) {
-            //navigator.webkitGetUserMedia("audio, video", function (stream) {
+                    }
 
-            L.Logger.info('User has granted access to local media.');
-            that.stream = stream;
+                } else if (spec.screen === true && videoOpt === undefined) {
+                    videoOpt = true;
+                }
+                var opt = {
+                    video: videoOpt,
+                    audio: spec.audio,
+                    fake: spec.fake,
+                    screen: spec.screen,
+                    extensionId: that.extensionId
+                };
+                L.Logger.debug(opt);
+                return Erizo.GetUserMedia(opt).then(function (stream) {
+                    //navigator.webkitGetUserMedia("audio, video", function (stream) {
 
-            streamEvent = Erizo.StreamEvent({type: 'access-accepted'});
-            that.dispatchEvent(streamEvent);
+                    L.Logger.info('User has granted access to local media.');
+                    that.stream = stream;
 
-          }, function (error) {
-            L.Logger.error('Failed to get access to local media. Error code was ' +
-                           error.code + '.');
-            var streamEvent = Erizo.StreamEvent({type: 'access-denied', msg:error});
-            that.dispatchEvent(streamEvent);
-          });
-          } else {
-            streamEvent = Erizo.StreamEvent({type: 'access-accepted'});
-            that.dispatchEvent(streamEvent);
-          }
-          } catch(e) {
+                    streamEvent = Erizo.StreamEvent({ type: 'access-accepted' });
+                    that.dispatchEvent(streamEvent);
+
+                }).catch(function (error) {
+                    L.Logger.error('Failed to get access to local media. Error code was ' +
+                        error.code + '.');
+                    var streamEvent = Erizo.StreamEvent({ type: 'access-denied', msg: error });
+                    that.dispatchEvent(streamEvent);
+                });
+            } else {
+                streamEvent = Erizo.StreamEvent({ type: 'access-accepted' });
+                that.dispatchEvent(streamEvent);
+            }
+        } catch (e) {
             L.Logger.error('Failed to get access to local media. Error was ' + e + '.');
-            streamEvent = Erizo.StreamEvent({type: 'access-denied', msg: e});
+            streamEvent = Erizo.StreamEvent({ type: 'access-denied', msg: e });
             that.dispatchEvent(streamEvent);
-          }
-      };
+        }
+    };
 
 
-     that.close = function () {
+    that.close = function () {
         if (that.local) {
             if (that.room !== undefined) {
                 that.room.unpublish(that);
@@ -167,18 +177,22 @@ Erizo.Stream = function (spec) {
         if (that.hasVideo() || this.hasScreen()) {
             // Draw on HTML
             if (elementID !== undefined) {
-                player = new Erizo.VideoPlayer({id: that.getID(),
-                                                    stream: that,
-                                                    elementID: elementID,
-                                                    options: options});
+                player = new Erizo.VideoPlayer({
+                    id: that.getID(),
+                    stream: that,
+                    elementID: elementID,
+                    options: options
+                });
                 that.player = player;
                 that.showing = true;
             }
         } else if (that.hasAudio) {
-            player = new Erizo.AudioPlayer({id: that.getID(),
-                                                stream: that,
-                                                elementID: elementID,
-                                                options: options});
+            player = new Erizo.AudioPlayer({
+                id: that.getID(),
+                stream: that,
+                elementID: elementID,
+                options: options
+            });
             that.player = player;
             that.showing = true;
         }
@@ -208,7 +222,7 @@ Erizo.Stream = function (spec) {
 
             var div;
             if (typeof that.elementID === 'object' &&
-              typeof that.elementID.appendChild === 'function') {
+                typeof that.elementID.appendChild === 'function') {
                 div = that.elementID;
             }
             else {
@@ -259,58 +273,58 @@ Erizo.Stream = function (spec) {
         }
     };
 
-    that.checkOptions = function (config, isUpdate){
+    that.checkOptions = function (config, isUpdate) {
         //TODO: Check for any incompatible options
-        if (isUpdate === true){  // We are updating the stream
-            if (config.video || config.audio || config.screen){
+        if (isUpdate === true) {  // We are updating the stream
+            if (config.video || config.audio || config.screen) {
                 L.Logger.warning('Cannot update type of subscription');
                 config.video = undefined;
                 config.audio = undefined;
                 config.screen = undefined;
             }
-        }else{  // on publish or subscribe
-            if(that.local === false){ // check what we can subscribe to
-                if (config.video === true && that.hasVideo() === false){
+        } else {  // on publish or subscribe
+            if (that.local === false) { // check what we can subscribe to
+                if (config.video === true && that.hasVideo() === false) {
                     L.Logger.warning('Trying to subscribe to video when there is no ' +
-                                     'video, won\'t subscribe to video');
+                        'video, won\'t subscribe to video');
                     config.video = false;
                 }
-                if (config.audio === true && that.hasAudio() === false){
+                if (config.audio === true && that.hasAudio() === false) {
                     L.Logger.warning('Trying to subscribe to audio when there is no ' +
-                                     'audio, won\'t subscribe to audio');
+                        'audio, won\'t subscribe to audio');
                     config.audio = false;
                 }
             }
         }
-        if(that.local === false){
-            if (!that.hasVideo() && (config.slideShowMode === true)){
+        if (that.local === false) {
+            if (!that.hasVideo() && (config.slideShowMode === true)) {
                 L.Logger.warning('Cannot enable slideShowMode if it is not a video ' +
-                                 'subscription, please check your parameters');
+                    'subscription, please check your parameters');
                 config.slideShowMode = false;
             }
         }
     };
 
     that.muteAudio = function (isMuted, callback) {
-        if (that.room && that.room.p2p){
+        if (that.room && that.room.p2p) {
             L.Logger.warning('muteAudio is not implemented in p2p streams');
-            callback ('error');
+            callback('error');
             return;
         }
-        var config = {muteStream : {audio : isMuted}};
+        var config = { muteStream: { audio: isMuted } };
         that.checkOptions(config, true);
         that.pc.updateSpec(config, callback);
     };
 
-    that._setQualityLayer = function(spatialLayer, temporalLayer, callback) {
-      if (that.room && that.room.p2p){
-          L.Logger.warning('setQualityLayer is not implemented in p2p streams');
-          callback ('error');
-          return;
-      }
-      var config = {qualityLayer : {spatialLayer: spatialLayer, temporalLayer: temporalLayer}};
-      that.checkOptions(config, true);
-      that.pc.updateSpec(config, callback);
+    that._setQualityLayer = function (spatialLayer, temporalLayer, callback) {
+        if (that.room && that.room.p2p) {
+            L.Logger.warning('setQualityLayer is not implemented in p2p streams');
+            callback('error');
+            return;
+        }
+        var config = { qualityLayer: { spatialLayer: spatialLayer, temporalLayer: temporalLayer } };
+        that.checkOptions(config, true);
+        that.pc.updateSpec(config, callback);
     };
 
     controlHandler = function (handlers, publisherSide, enable) {
@@ -321,15 +335,17 @@ Erizo.Stream = function (spec) {
         handlers = (handlers instanceof Array) ? handlers : [];
 
         if (handlers.length > 0) {
-            that.room.sendControlMessage(that, 'control', {name: 'controlhandlers', 
-                                        enable: enable, 
-                                        publisherSide: publisherSide, 
-                                        handlers: handlers});
+            that.room.sendControlMessage(that, 'control', {
+                name: 'controlhandlers',
+                enable: enable,
+                publisherSide: publisherSide,
+                handlers: handlers
+            });
         }
     };
 
     that.disableHandlers = function (handlers, publisherSide) {
-      controlHandler(handlers, publisherSide, false);
+        controlHandler(handlers, publisherSide, false);
     };
 
     that.enableHandlers = function (handlers, publisherSide) {
@@ -342,8 +358,8 @@ Erizo.Stream = function (spec) {
         if (that.pc) {
             that.checkOptions(config, true);
             if (that.local) {
-                if(that.room.p2p) {
-                    for (var index in that.pc){
+                if (that.room.p2p) {
+                    for (var index in that.pc) {
                         that.pc[index].updateSpec(config, callback);
                     }
                 } else {

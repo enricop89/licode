@@ -62,7 +62,7 @@ window.onload = function () {
   // The default one only works in our Lynckia test servers.
   // If we are not using chrome, the creation of the stream will fail regardless.
   if (screen){
-    config.extensionId = 'okeephmleflklcdebijnponpabbmmgeo';
+    config.extensionId = 'moekifjbageihhhpbdgdaechbjomekpp';
   }
   localStream = Erizo.Stream(config);
   var createToken = function(roomData, callback) {
